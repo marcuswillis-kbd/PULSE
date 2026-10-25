@@ -26,9 +26,13 @@ PRINT_KEYS = (
     "DTSDKName",
     "LSRequiresIPhoneOS",
     "MinimumOSVersion",
+    "NSHealthShareUsageDescription",
+    "NSHealthUpdateUsageDescription",
     "UIDeviceFamily",
     "WKApplication",
+    "WKBackgroundModes",
     "WKCompanionAppBundleIdentifier",
+    "WKRunsIndependentlyOfCompanionApp",
 )
 
 
@@ -55,6 +59,16 @@ def print_plist(label: str, app: Path, info: dict) -> None:
 def require(errors: list[str], ok: bool, message: str) -> None:
     if not ok:
         errors.append(message)
+
+
+def require_usage(errors: list[str], label: str, info: dict) -> None:
+    for key in ("NSHealthShareUsageDescription", "NSHealthUpdateUsageDescription"):
+        value = info.get(key)
+        require(
+            errors,
+            isinstance(value, str) and bool(value.strip()),
+            f"{label} {key} is {value!r}.",
+        )
 
 
 def check_payload(payload: Path) -> None:
@@ -126,6 +140,7 @@ def check_payload(payload: Path) -> None:
         phone_info.get("CFBundlePackageType") == "APPL",
         f"iPhone CFBundlePackageType is {phone_info.get('CFBundlePackageType')!r}.",
     )
+    require_usage(errors, "iPhone", phone_info)
 
     require(
         errors,
@@ -170,6 +185,19 @@ def check_payload(payload: Path) -> None:
         "Watch WKCompanionAppBundleIdentifier is "
         f"{watch_info.get('WKCompanionAppBundleIdentifier')!r}.",
     )
+    require(
+        errors,
+        watch_info.get("WKRunsIndependentlyOfCompanionApp") is False,
+        "Watch WKRunsIndependentlyOfCompanionApp is "
+        f"{watch_info.get('WKRunsIndependentlyOfCompanionApp')!r}.",
+    )
+    require(
+        errors,
+        watch_info.get("WKBackgroundModes") == ["workout-processing"],
+        "Watch WKBackgroundModes is "
+        f"{watch_info.get('WKBackgroundModes')!r}.",
+    )
+    require_usage(errors, "Watch", watch_info)
     if errors:
         print("Info.plist platform check failed:", file=sys.stderr)
         for message in errors:
@@ -194,6 +222,8 @@ def _self_test() -> None:
         "DTPlatformName": "iphoneos",
         "LSRequiresIPhoneOS": True,
         "MinimumOSVersion": "17.0",
+        "NSHealthShareUsageDescription": "share",
+        "NSHealthUpdateUsageDescription": "update",
         "UIDeviceFamily": [1],
     }
     watch = {
@@ -202,9 +232,13 @@ def _self_test() -> None:
         "DTPlatformName": "watchos",
         "LSRequiresIPhoneOS": False,
         "MinimumOSVersion": "10.0",
+        "NSHealthShareUsageDescription": "share",
+        "NSHealthUpdateUsageDescription": "update",
         "UIDeviceFamily": [4],
         "WKApplication": True,
+        "WKBackgroundModes": ["workout-processing"],
         "WKCompanionAppBundleIdentifier": PHONE_ID,
+        "WKRunsIndependentlyOfCompanionApp": False,
     }
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -221,6 +255,19 @@ def _self_test() -> None:
                 raise SystemExit("string CFBundleSupportedPlatforms was accepted")
         else:
             raise SystemExit("string CFBundleSupportedPlatforms was accepted")
+        missing_wk = root / "missing-wk"
+        _write(missing_wk / "PULSE.app", phone)
+        _write(
+            missing_wk / "PULSE.app" / "PlugIns" / "PULSEWatch.app",
+            {key: value for key, value in watch.items() if key != "WKApplication"},
+        )
+        try:
+            check_payload(missing_wk)
+        except SystemExit as error:
+            if error.code in (None, 0):
+                raise SystemExit("missing WKApplication was accepted")
+        else:
+            raise SystemExit("missing WKApplication was accepted")
     print("self-test ok")
 
 

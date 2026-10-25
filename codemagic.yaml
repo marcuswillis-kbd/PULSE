@@ -10,6 +10,7 @@ workflows:
         script: |
           brew install xcodegen
           xcodegen generate --spec project.yml
+          python3 Scripts/check_source_plists.py
       - name: Compile for iPhone simulator
         script: |
           xcodebuild -project PULSE.xcodeproj -scheme PULSE -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
@@ -51,6 +52,7 @@ workflows:
         script: |
           brew install xcodegen
           xcodegen generate --spec project.yml
+          python3 Scripts/check_source_plists.py
       - name: Embed the Watch app for Xcode 26
         script: python3 Scripts/patch_watch_embed.py PULSE.xcodeproj/project.pbxproj
       - name: Apply provisioning profiles

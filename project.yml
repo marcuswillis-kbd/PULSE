@@ -19,14 +19,17 @@ targets:
         excludes:
           - "**/*.entitlements"
           - "**/Info.plist"
-    info:
-      path: Phone/Info.plist
+    # No `info:` key. XcodeGen writePlists() replaces info.path with a
+    # default template (bundle id, name, versions 1.0 and 1, package type)
+    # and deletes every other key. CI runs `xcodegen generate` before the
+    # archive, so that template is what Xcode compiles. Xcode then injects
+    # CFBundleSupportedPlatforms, DTPlatformName, MinimumOSVersion, and
+    # UIDeviceFamily, which is why those showed up in the IPA while
+    # LSRequiresIPhoneOS did not. Phone/Info.plist is the file that ships.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pulsebreath.local.PULSE
-        # Explicit Info.plist so CFBundleSupportedPlatforms stays an array
-        # of one string. A generated plist can leave altool unable to decide
-        # the platform (error 19) even when the value prints as iPhoneOS.
+        INFOPLIST_FILE: Phone/Info.plist
         GENERATE_INFOPLIST_FILE: "NO"
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_ENTITLEMENTS: Phone/PULSE.entitlements
@@ -49,12 +52,16 @@ targets:
         excludes:
           - "**/*.entitlements"
           - "**/Info.plist"
-    info:
-      path: Watch/Info.plist
+    # Same as the iPhone target: do not set `info:`. A regenerated Watch
+    # plist drops WKApplication and WKCompanionAppBundleIdentifier, which
+    # App Store Connect rejects on a companion watchOS app. Watch/Info.plist
+    # keeps WKApplication true and WKCompanionAppBundleIdentifier
+    # com.pulsebreath.local.PULSE.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pulsebreath.local.PULSE.watchkitapp
         PRODUCT_NAME: PULSEWatch
+        INFOPLIST_FILE: Watch/Info.plist
         GENERATE_INFOPLIST_FILE: "NO"
         TARGETED_DEVICE_FAMILY: "4"
         SKIP_INSTALL: "YES"

@@ -55,7 +55,9 @@ Screen: Codemagic → Applications → PULSE → Start new build.
 2. Workflow: `pulse-testflight`.
 3. Start the build.
 
-The workflow generates the Xcode project, embeds `PULSEWatch.app` in `PULSE.app/PlugIns`, fetches `pulse_distribution`, `pulse_app_store`, and `pulse_watch_app_store`, applies them with `xcode-project use-profiles`, sets the build number to one higher than the latest TestFlight build for Apple ID `6826766285`, exports an `.ipa`, checks the Watch app and HealthKit entitlement are inside it, uploads to App Store Connect, and sets `submit_to_testflight: true`.
+The workflow generates the Xcode project, embeds `PULSEWatch.app` in `PULSE.app/PlugIns`, fetches `pulse_distribution`, `pulse_app_store`, and `pulse_watch_app_store`, applies them with `xcode-project use-profiles`, sets the build number to one higher than the latest TestFlight build for Apple ID `6826766285`, exports an `.ipa`, checks the Watch app, HealthKit entitlement, and Info.plist companion keys are inside it, uploads to App Store Connect, and sets `submit_to_testflight: true`.
+
+`Phone/Info.plist` and `Watch/Info.plist` are the files Xcode compiles. `project.yml` points at them with `INFOPLIST_FILE` and `GENERATE_INFOPLIST_FILE: "NO"`, and it has no XcodeGen `info:` block. `xcodegen generate` rewrites any plist named by `info.path` down to a default template, which drops `WKApplication` and `WKCompanionAppBundleIdentifier`. Leave those keys in `Watch/Info.plist`.
 
 `submit_to_testflight` asks Apple to accept the build for beta review. Internal testers (App Store Connect users on the team, including the Account Holder) can install after processing without an external group. No beta group name is configured. If the publishing step fails because review metadata is incomplete, open TestFlight anyway: the binary is often already uploaded.
 
