@@ -14,7 +14,7 @@ if [ -z "$apple_id" ]; then
     --no-color || true)"
   if ! apple_id="$(printf '%s' "$listing" | python3 Scripts/asc_id.py app "$BUNDLE_ID")"; then
     echo "No App Store Connect app record for ${BUNDLE_ID}."
-    echo "Create the iOS app (name Pulse, SKU PULSE001) before this workflow."
+    echo "The existing app is \"Connected pulse\" (Apple ID 6826766285, SKU PULSE001)."
     echo "Do not create a separate app for the Watch; it is embedded."
     exit 1
   fi

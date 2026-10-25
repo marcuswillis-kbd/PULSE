@@ -17,16 +17,20 @@ workflows:
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - /tmp/xcodebuild_logs/*.log
 
-  # Signed archive for TestFlight. The integration name below must match
-  # Codemagic → Team integrations → Developer Portal exactly.
-  # Change `PULSE ASC` here if the key was saved under another name.
+  # Signed archive for TestFlight.
   #
-  # Automatic App Store signing (distribution_type: app_store) for:
+  # distribution_type is app_store (CLI type IOS_APP_STORE) for both:
   #   com.pulsebreath.local.PULSE
   #   com.pulsebreath.local.PULSE.watchkitapp
-  # Profiles are created during the build with fetch-signing-files --create.
-  # An ios_signing: prefetch is intentionally not set: Codemagic aborts with
-  # "No matching profiles found" before a script can create those profiles.
+  #
+  # ios_signing fetches the Apple Distribution certificate by its Codemagic
+  # reference name. It does not set distribution_type + bundle_identifier:
+  # that form only downloads provisioning profiles already stored in
+  # Codemagic Code signing identities, and aborts with
+  # "No matching profiles found" before a script can create them.
+  # Scripts/ci_testflight_profiles.py creates one App Store profile per
+  # bundle id through the PULSE ASC integration, then use-profiles applies
+  # both. No CERTIFICATE_PRIVATE_KEY and no variable group are required.
   pulse-testflight:
     name: PULSE TestFlight (signed iPhone + Watch)
     instance_type: mac_mini_m2
@@ -35,13 +39,15 @@ workflows:
       app_store_connect: PULSE ASC
     environment:
       xcode: latest
-      groups:
-        - pulse_signing
+      ios_signing:
+        certificates:
+          - certificate: pulse_distribution
+            environment_variable: PULSE_DISTRIBUTION_CERTIFICATE
       vars:
-        DISTRIBUTION_TYPE: app_store
         BUNDLE_ID: com.pulsebreath.local.PULSE
         WATCH_BUNDLE_ID: com.pulsebreath.local.PULSE.watchkitapp
         XCODE_SCHEME: PULSE
+        APP_STORE_APPLE_ID: "6826766285"
     scripts:
       - name: Generate Xcode project
         script: |
@@ -49,8 +55,10 @@ workflows:
           xcodegen generate --spec project.yml
       - name: Embed the Watch app for Xcode 26
         script: python3 Scripts/patch_watch_embed.py PULSE.xcodeproj/project.pbxproj
-      - name: Create App Store signing files
-        script: bash Scripts/ci_testflight_sign.sh
+      - name: Create App Store profiles for iPhone and Watch
+        script: python3 Scripts/ci_testflight_profiles.py
+      - name: Apply provisioning profiles
+        script: xcode-project use-profiles
       - name: Increment build number from TestFlight
         script: bash Scripts/ci_testflight_version.sh
       - name: Archive and export IPA
