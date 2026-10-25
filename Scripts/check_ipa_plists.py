@@ -158,10 +158,12 @@ def check_payload(payload: Path) -> None:
         watch_info.get("DTPlatformName") == "watchos",
         f"Watch DTPlatformName is {watch_info.get('DTPlatformName')!r}.",
     )
+    # Xcode drops LSRequiresIPhoneOS while processing a watchOS bundle.
+    # Absent and false are both valid. True is not.
     require(
         errors,
-        watch_info.get("LSRequiresIPhoneOS") is False,
-        "Watch LSRequiresIPhoneOS must be false. "
+        watch_info.get("LSRequiresIPhoneOS", False) is False,
+        "Watch LSRequiresIPhoneOS must be absent or false. "
         f"Got {watch_info.get('LSRequiresIPhoneOS')!r}.",
     )
     require(
@@ -245,6 +247,26 @@ def _self_test() -> None:
         _write(root / "PULSE.app", phone)
         _write(root / "PULSE.app" / "PlugIns" / "PULSEWatch.app", watch)
         check_payload(root)
+        stripped = root / "stripped"
+        _write(stripped / "PULSE.app", phone)
+        _write(
+            stripped / "PULSE.app" / "PlugIns" / "PULSEWatch.app",
+            {key: value for key, value in watch.items() if key != "LSRequiresIPhoneOS"},
+        )
+        check_payload(stripped)
+        watch_requires_ios = root / "watch-requires-ios"
+        _write(watch_requires_ios / "PULSE.app", phone)
+        _write(
+            watch_requires_ios / "PULSE.app" / "PlugIns" / "PULSEWatch.app",
+            {**watch, "LSRequiresIPhoneOS": True},
+        )
+        try:
+            check_payload(watch_requires_ios)
+        except SystemExit as error:
+            if error.code in (None, 0):
+                raise SystemExit("Watch LSRequiresIPhoneOS true was accepted")
+        else:
+            raise SystemExit("Watch LSRequiresIPhoneOS true was accepted")
         broken = root / "broken"
         _write(broken / "PULSE.app", {**phone, "CFBundleSupportedPlatforms": "iPhoneOS"})
         _write(broken / "PULSE.app" / "PlugIns" / "PULSEWatch.app", watch)

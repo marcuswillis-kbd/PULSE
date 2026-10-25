@@ -34,7 +34,8 @@ codesign -d --entitlements :- "$watch" 2>/dev/null | grep -q 'com.apple.develope
 echo "HealthKit entitlement is present on PULSE.app and PULSEWatch.app"
 python3 Scripts/check_ipa_plists.py "$tmp/Payload"
 
-# Publish runs altool --upload-app, which fails with
+# A passing plist check falls through to altool. Publish later runs
+# altool --upload-app, which fails with
 # "Cannot determine the 'platform' from the info.plist" before any
 # server response. Validate here so that error sits under the plist dump.
 echo "Validating $ipa with altool"
