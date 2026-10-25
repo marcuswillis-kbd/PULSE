@@ -1,0 +1,18 @@
+workflows:
+  pulse-ios-watch:
+    name: PULSE iPhone + Apple Watch (unsigned compile test)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+    scripts:
+      - name: Generate Xcode project
+        script: |
+          brew install xcodegen
+          xcodegen generate --spec project.yml
+      - name: Compile for iPhone simulator
+        script: |
+          xcodebuild -project PULSE.xcodeproj -scheme PULSE -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+    artifacts:
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - /tmp/xcodebuild_logs/*.log
