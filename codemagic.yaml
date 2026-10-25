@@ -76,4 +76,8 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        # Internal TestFlight only. submit_to_testflight sends the build to
+        # external beta review, which fails while Test Information (feedback
+        # email and beta review contact) is empty. Group Marcus is internal.
+        beta_groups:
+          - Marcus

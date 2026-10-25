@@ -55,11 +55,11 @@ Screen: Codemagic → Applications → PULSE → Start new build.
 2. Workflow: `pulse-testflight`.
 3. Start the build.
 
-The workflow generates the Xcode project, embeds `PULSEWatch.app` in `PULSE.app/Watch`, fetches `pulse_distribution`, `pulse_app_store`, and `pulse_watch_app_store`, applies them with `xcode-project use-profiles`, sets `CURRENT_PROJECT_VERSION` to the greater of Codemagic `$BUILD_NUMBER` and one more than the latest TestFlight build for Apple ID `6826766285`, exports an `.ipa`, checks the Watch app, its executable, the HealthKit entitlement, and Info.plist companion keys, uploads to App Store Connect, and sets `submit_to_testflight: true`.
+The workflow generates the Xcode project, embeds `PULSEWatch.app` in `PULSE.app/Watch`, fetches `pulse_distribution`, `pulse_app_store`, and `pulse_watch_app_store`, applies them with `xcode-project use-profiles`, sets `CURRENT_PROJECT_VERSION` to the greater of Codemagic `$BUILD_NUMBER` and one more than the latest TestFlight build for Apple ID `6826766285`, exports an `.ipa`, checks the Watch app, its executable, the HealthKit entitlement, and Info.plist companion keys, uploads to App Store Connect, and adds the build to the internal TestFlight group Marcus.
 
 `Phone/Info.plist` and `Watch/Info.plist` are the files Xcode compiles. `project.yml` points at them with `INFOPLIST_FILE` and `GENERATE_INFOPLIST_FILE: "NO"`, and it has no XcodeGen `info:` block. `xcodegen generate` rewrites any plist named by `info.path` down to a default template, which drops `WKApplication` and `WKCompanionAppBundleIdentifier`. Leave those keys in `Watch/Info.plist`.
 
-`submit_to_testflight` asks Apple to accept the build for beta review. Internal testers (App Store Connect users on the team, including the Account Holder) can install after processing without an external group. No beta group name is configured. If the publishing step fails because review metadata is incomplete, open TestFlight anyway: the binary is often already uploaded.
+Publishing adds the processed build to the internal group Marcus. It does not submit the build for external TestFlight beta review, so an empty feedback email or beta review contact does not fail the run.
 
 TestFlight shows the App Store Connect name **Connected pulse**. The icon label on the home screen is **PULSE**.
 
