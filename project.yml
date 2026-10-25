@@ -24,7 +24,7 @@ targets:
       - target: PULSEWatch
         embed: true
   PULSEWatch:
-    type: application.watchapp2
+    type: application
     platform: watchOS
     sources: [Watch]
     settings:
