@@ -1,0 +1,6 @@
+PULSE.xcodeproj/
+DerivedData/
+build/
+*.ipa
+*.xcarchive
+.DS_Store

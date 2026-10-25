@@ -2,37 +2,66 @@ name: PULSE
 options:
   bundleIdPrefix: com.pulsebreath.local
   deploymentTarget:
-    iOS: '17.0'
-    watchOS: '10.0'
+    iOS: "17.0"
+    watchOS: "10.0"
 settings:
   base:
-    SWIFT_VERSION: '5.0'
-    MARKETING_VERSION: '1.0'
-    CURRENT_PROJECT_VERSION: '1'
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    VERSIONING_SYSTEM: apple-generic
 targets:
   PULSE:
     type: application
     platform: iOS
-    sources: [Phone]
+    sources:
+      - path: Phone
+        excludes:
+          - "**/*.entitlements"
+          - "**/Info.plist"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pulsebreath.local.PULSE
         GENERATE_INFOPLIST_FILE: YES
-        TARGETED_DEVICE_FAMILY: '1'
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_CFBundleDisplayName: PULSE
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: "NO"
+        # The phone does not query HealthKit. It displays BPM the Watch sends.
+        # The entitlement is still required: Apple expects the companion iOS
+        # target to carry HealthKit when the embedded watchOS app starts an
+        # HKWorkoutSession, and App Store validation requires these strings
+        # on every target that has the entitlement.
+        INFOPLIST_KEY_NSHealthShareUsageDescription: PULSE shows the heart rate your Apple Watch reads during a breathing session.
+        INFOPLIST_KEY_NSHealthUpdateUsageDescription: PULSE uses a temporary Apple Watch workout to measure heart rate. This iPhone app does not save health data.
+        CODE_SIGN_ENTITLEMENTS: Phone/PULSE.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
+      # type: application (not application.watchapp2) is the single-target
+      # watchOS 10 product. watchapp2 duplicates the executable and fails
+      # with "Multiple commands produce". link stays false so the Watch app
+      # is embedded, not linked as a library. CodeSignOnCopy is applied by
+      # Scripts/patch_watch_embed.py during the TestFlight workflow only;
+      # the unsigned compile test keeps the embed phase that already built.
       - target: PULSEWatch
         embed: true
+        link: false
   PULSEWatch:
     type: application
     platform: watchOS
-    sources: [Watch]
+    sources:
+      - path: Watch
+        excludes:
+          - "**/*.entitlements"
+          - "**/Info.plist"
+    info:
+      path: Watch/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pulsebreath.local.PULSE.watchkitapp
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.pulsebreath.local.PULSE
-        INFOPLIST_KEY_WKWatchKitApp: YES
-        INFOPLIST_KEY_NSHealthShareUsageDescription: PULSE uses heart rate while you follow the breathing guide.
-        INFOPLIST_KEY_NSHealthUpdateUsageDescription: PULSE starts a temporary breathing workout to read your heart rate.
+        PRODUCT_NAME: PULSEWatch
+        GENERATE_INFOPLIST_FILE: "NO"
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: "YES"
         CODE_SIGN_ENTITLEMENTS: Watch/PULSEWatch.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

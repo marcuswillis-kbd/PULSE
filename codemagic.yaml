@@ -16,3 +16,55 @@ workflows:
     artifacts:
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - /tmp/xcodebuild_logs/*.log
+
+  # Signed archive for TestFlight. The integration name below must match
+  # Codemagic → Team integrations → Developer Portal exactly.
+  # Change `PULSE ASC` here if the key was saved under another name.
+  #
+  # Automatic App Store signing (distribution_type: app_store) for:
+  #   com.pulsebreath.local.PULSE
+  #   com.pulsebreath.local.PULSE.watchkitapp
+  # Profiles are created during the build with fetch-signing-files --create.
+  # An ios_signing: prefetch is intentionally not set: Codemagic aborts with
+  # "No matching profiles found" before a script can create those profiles.
+  pulse-testflight:
+    name: PULSE TestFlight (signed iPhone + Watch)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: PULSE ASC
+    environment:
+      xcode: latest
+      groups:
+        - pulse_signing
+      vars:
+        DISTRIBUTION_TYPE: app_store
+        BUNDLE_ID: com.pulsebreath.local.PULSE
+        WATCH_BUNDLE_ID: com.pulsebreath.local.PULSE.watchkitapp
+        XCODE_SCHEME: PULSE
+    scripts:
+      - name: Generate Xcode project
+        script: |
+          brew install xcodegen
+          xcodegen generate --spec project.yml
+      - name: Embed the Watch app for Xcode 26
+        script: python3 Scripts/patch_watch_embed.py PULSE.xcodeproj/project.pbxproj
+      - name: Create App Store signing files
+        script: bash Scripts/ci_testflight_sign.sh
+      - name: Increment build number from TestFlight
+        script: bash Scripts/ci_testflight_version.sh
+      - name: Archive and export IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/PULSE.xcodeproj" \
+            --scheme "$XCODE_SCHEME"
+      - name: Verify the Watch app is inside the IPA
+        script: bash Scripts/ci_verify_ipa.sh
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
