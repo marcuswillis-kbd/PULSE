@@ -19,18 +19,14 @@ workflows:
 
   # Signed archive for TestFlight.
   #
-  # distribution_type is app_store (CLI type IOS_APP_STORE) for both:
-  #   com.pulsebreath.local.PULSE
-  #   com.pulsebreath.local.PULSE.watchkitapp
-  #
-  # ios_signing fetches the Apple Distribution certificate by its Codemagic
-  # reference name. It does not set distribution_type + bundle_identifier:
-  # that form only downloads provisioning profiles already stored in
-  # Codemagic Code signing identities, and aborts with
-  # "No matching profiles found" before a script can create them.
-  # Scripts/ci_testflight_profiles.py creates one App Store profile per
-  # bundle id through the PULSE ASC integration, then use-profiles applies
-  # both. No CERTIFICATE_PRIVATE_KEY and no variable group are required.
+  # Fetches stored Code signing identities by reference name. Codemagic
+  # requires provisioning_profiles here; certificates alone are rejected.
+  # distribution_type + bundle_identifier is the other legal form, and it
+  # cannot be combined with these lists. Named profiles are used so the
+  # Watch profile is fetched even if extension matching misses it.
+  #   pulse_app_store        com.pulsebreath.local.PULSE
+  #   pulse_watch_app_store  com.pulsebreath.local.PULSE.watchkitapp
+  #   pulse_distribution     Apple Distribution certificate
   pulse-testflight:
     name: PULSE TestFlight (signed iPhone + Watch)
     instance_type: mac_mini_m2
@@ -40,9 +36,11 @@ workflows:
     environment:
       xcode: latest
       ios_signing:
+        provisioning_profiles:
+          - pulse_app_store
+          - pulse_watch_app_store
         certificates:
-          - certificate: pulse_distribution
-            environment_variable: PULSE_DISTRIBUTION_CERTIFICATE
+          - pulse_distribution
       vars:
         BUNDLE_ID: com.pulsebreath.local.PULSE
         WATCH_BUNDLE_ID: com.pulsebreath.local.PULSE.watchkitapp
@@ -55,8 +53,6 @@ workflows:
           xcodegen generate --spec project.yml
       - name: Embed the Watch app for Xcode 26
         script: python3 Scripts/patch_watch_embed.py PULSE.xcodeproj/project.pbxproj
-      - name: Create App Store profiles for iPhone and Watch
-        script: python3 Scripts/ci_testflight_profiles.py
       - name: Apply provisioning profiles
         script: xcode-project use-profiles
       - name: Increment build number from TestFlight

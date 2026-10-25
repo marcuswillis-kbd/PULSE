@@ -21,28 +21,33 @@ The Watch identifier is the companion embedded in the iPhone app. It is not a se
 - Codemagic Developer Portal integration name `PULSE ASC`. This must match `integrations.app_store_connect` in `codemagic.yaml`.
 - Apple Distribution certificate in Codemagic Code signing identities, reference name `pulse_distribution` (expires 25 Oct 2027).
 
-No provisioning profiles exist yet. Do not create them by hand, and do not add a `CERTIFICATE_PRIVATE_KEY` variable. The certificate and its private key already live in Codemagic under `pulse_distribution`.
+The Apple Distribution certificate and its private key live in Codemagic under `pulse_distribution`. No `CERTIFICATE_PRIVATE_KEY` variable is used.
 
-## Why profiles are created during the build
+App Store provisioning profiles are created in Apple Developer and imported into Codemagic Code signing identities. The workflow fetches them by reference name:
 
-Codemagic's `ios_signing` block with `distribution_type: app_store` and `bundle_identifier` only downloads profiles that are already stored in Code signing identities. With an empty profile list, Codemagic stops the build before any script runs and reports `No matching profiles found`. A parent bundle ID would also match `com.pulsebreath.local.PULSE.watchkitapp`, but only among profiles already uploaded. That form cannot create the missing profiles.
-
-`pulse-testflight` therefore fetches the certificate by reference name:
+| Reference name | Bundle ID |
+| --- | --- |
+| `pulse_app_store` | `com.pulsebreath.local.PULSE` |
+| `pulse_watch_app_store` | `com.pulsebreath.local.PULSE.watchkitapp` |
 
 ```yaml
 ios_signing:
+  provisioning_profiles:
+    - pulse_app_store
+    - pulse_watch_app_store
   certificates:
-    - certificate: pulse_distribution
+    - pulse_distribution
 ```
 
-The `PULSE ASC` integration then creates one App Store profile (`IOS_APP_STORE`) for each bundle ID, tied to that distribution certificate. `xcode-project use-profiles` applies both. Later builds reuse the profiles when they are still valid for this certificate. The Watch app stays embedded in `PULSE.app/PlugIns`.
+Codemagic rejects `ios_signing` when only `certificates` is set. The other legal form is `distribution_type: app_store` plus `bundle_identifier`, which also matches `com.pulsebreath.local.PULSE.*`, and that form cannot be combined with the reference-name lists. Naming both profiles is what the workflow uses, so the Watch profile is fetched directly. `xcode-project use-profiles` applies them. The Watch app stays embedded in `PULSE.app/PlugIns`.
 
 ## What is left before the build
 
-Nothing else in Apple or Codemagic, as long as these two names are unchanged:
+Import both profiles into Codemagic → Code signing identities → iOS provisioning profiles, using the reference names above, each tied to `pulse_distribution`. Then start the build. These names must match `codemagic.yaml`:
 
 - Integration: `PULSE ASC`
 - Certificate reference: `pulse_distribution`
+- Profile references: `pulse_app_store` and `pulse_watch_app_store`
 
 Screen: Codemagic → Applications → PULSE → Start new build.
 
@@ -50,7 +55,7 @@ Screen: Codemagic → Applications → PULSE → Start new build.
 2. Workflow: `pulse-testflight`.
 3. Start the build.
 
-The workflow generates the Xcode project, embeds `PULSEWatch.app` in `PULSE.app/PlugIns`, creates and applies both App Store profiles, sets the build number to one higher than the latest TestFlight build for Apple ID `6826766285`, exports an `.ipa`, checks the Watch app and HealthKit entitlement are inside it, uploads to App Store Connect, and sets `submit_to_testflight: true`.
+The workflow generates the Xcode project, embeds `PULSEWatch.app` in `PULSE.app/PlugIns`, fetches `pulse_distribution`, `pulse_app_store`, and `pulse_watch_app_store`, applies them with `xcode-project use-profiles`, sets the build number to one higher than the latest TestFlight build for Apple ID `6826766285`, exports an `.ipa`, checks the Watch app and HealthKit entitlement are inside it, uploads to App Store Connect, and sets `submit_to_testflight: true`.
 
 `submit_to_testflight` asks Apple to accept the build for beta review. Internal testers (App Store Connect users on the team, including the Account Holder) can install after processing without an external group. No beta group name is configured. If the publishing step fails because review metadata is incomplete, open TestFlight anyway: the binary is often already uploaded.
 
