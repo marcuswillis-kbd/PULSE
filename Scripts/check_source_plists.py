@@ -15,8 +15,6 @@ import re
 import sys
 from pathlib import Path
 
-import yaml
-
 
 ROOT = Path(__file__).resolve().parent.parent
 PHONE_PLIST = "Phone/Info.plist"
@@ -45,32 +43,138 @@ def require(errors: list[str], ok: bool, message: str) -> None:
         errors.append(message)
 
 
-def check_spec(errors: list[str]) -> None:
-    spec = yaml.safe_load((ROOT / "project.yml").read_text())
+def _without_comment(line: str) -> str:
+    quote = ""
+    for index, char in enumerate(line):
+        if quote:
+            if char == quote:
+                quote = ""
+            continue
+        if char in {'"', "'"}:
+            quote = char
+            continue
+        if char == "#":
+            return line[:index]
+    return line
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def target_bodies(text: str) -> dict[str, list[str]]:
+    """Return the lines belonging to each target in project.yml.
+
+    This is the subset of YAML this file uses: a `targets:` mapping whose
+    children are the target names. Comments are ignored. It is intentionally
+    not a YAML parser, so the Codemagic image does not need PyYAML.
+    """
+    lines = [_without_comment(line).rstrip() for line in text.splitlines()]
+    start = next((index for index, line in enumerate(lines) if line.strip() == "targets:"), None)
+    if start is None:
+        return {}
+    child_indent = None
+    for line in lines[start + 1 :]:
+        if not line.strip():
+            continue
+        if _indent(line) == 0:
+            return {}
+        child_indent = _indent(line)
+        break
+    if child_indent is None:
+        return {}
+
+    bodies: dict[str, list[str]] = {}
+    current = ""
+    buffer: list[str] = []
+    for line in lines[start + 1 :]:
+        if not line.strip():
+            if current:
+                buffer.append("")
+            continue
+        indent = _indent(line)
+        if indent < child_indent or (indent == 0):
+            break
+        stripped = line.strip()
+        if indent == child_indent and stripped.endswith(":") and not stripped.startswith("-"):
+            if current:
+                bodies[current] = buffer
+            current = stripped[:-1].strip().strip("\"'")
+            buffer = []
+            continue
+        if current:
+            buffer.append(line)
+    if current:
+        bodies[current] = buffer
+    return bodies
+
+
+def _direct_keys(body: list[str]) -> list[tuple[str, str]]:
+    indents = [_indent(line) for line in body if line.strip()]
+    if not indents:
+        return []
+    direct = min(indents)
+    keys: list[tuple[str, str]] = []
+    for line in body:
+        if not line.strip() or _indent(line) != direct:
+            continue
+        stripped = line.strip()
+        if stripped.startswith("-") or ":" not in stripped:
+            continue
+        key, _, value = stripped.partition(":")
+        key = key.strip()
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            keys.append((key, value.strip()))
+    return keys
+
+
+def _setting_values(body: list[str], name: str) -> list[str]:
+    values = []
+    for line in body:
+        stripped = line.strip()
+        prefix = name + ":"
+        if stripped.startswith(prefix):
+            values.append(stripped[len(prefix) :].strip())
+    return values
+
+
+def _quoted(value: str) -> str | None:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        return value[1:-1]
+    return None
+
+
+def check_spec_text(errors: list[str], text: str) -> None:
     expected = {"PULSE": PHONE_PLIST, "PULSEWatch": WATCH_PLIST}
-    targets = spec.get("targets") or {}
+    bodies = target_bodies(text)
     for name, plist in expected.items():
-        target = targets.get(name)
-        if not isinstance(target, dict):
+        body = bodies.get(name)
+        if body is None:
             errors.append(f"project.yml has no {name} target.")
             continue
-        if "info" in target:
+        info = [value for key, value in _direct_keys(body) if key == "info"]
+        if info:
             errors.append(
                 f"{name} still has an info: block. xcodegen generate would "
                 f"overwrite {plist}."
             )
-        settings = (target.get("settings") or {}).get("base") or {}
+        infolist = _setting_values(body, "INFOPLIST_FILE")
         require(
             errors,
-            settings.get("INFOPLIST_FILE") == plist,
-            f"{name} INFOPLIST_FILE is {settings.get('INFOPLIST_FILE')!r}.",
+            infolist == [plist],
+            f"{name} INFOPLIST_FILE is {infolist!r}.",
         )
+        generated = _setting_values(body, "GENERATE_INFOPLIST_FILE")
         require(
             errors,
-            settings.get("GENERATE_INFOPLIST_FILE") == "NO",
-            f"{name} GENERATE_INFOPLIST_FILE is "
-            f"{settings.get('GENERATE_INFOPLIST_FILE')!r}.",
+            [_quoted(value) for value in generated] == ["NO"],
+            f"{name} GENERATE_INFOPLIST_FILE must be the quoted string "
+            f'"NO". Got {generated!r}.',
         )
+
+
+def check_spec(errors: list[str]) -> None:
+    check_spec_text(errors, (ROOT / "project.yml").read_text())
 
 
 def check_phone(errors: list[str], info: dict) -> None:
@@ -166,7 +270,47 @@ def check_project(errors: list[str]) -> None:
     )
 
 
+def _expect_error(text: str, needle: str) -> None:
+    errors: list[str] = []
+    check_spec_text(errors, text)
+    if not any(needle in message for message in errors):
+        raise SystemExit(f"expected {needle!r} in {errors!r}")
+
+
+def _self_test() -> None:
+    source = (ROOT / "project.yml").read_text()
+    errors: list[str] = []
+    check_spec_text(errors, source)
+    if errors:
+        fail(errors)
+    commented = source.replace(
+        "    # No `info:` key.",
+        "    # info: path would be ignored because this line is a comment",
+        1,
+    )
+    comment_errors: list[str] = []
+    check_spec_text(comment_errors, commented)
+    if comment_errors:
+        fail(comment_errors)
+    broken = source.replace(
+        "    settings:\n",
+        "    info:\n      path: Phone/Info.plist\n    settings:\n",
+        1,
+    )
+    _expect_error(broken, "info:")
+    unquoted = source.replace(
+        'GENERATE_INFOPLIST_FILE: "NO"',
+        "GENERATE_INFOPLIST_FILE: NO",
+        1,
+    )
+    _expect_error(unquoted, "GENERATE_INFOPLIST_FILE")
+    print("self-test ok")
+
+
 def main() -> None:
+    if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
+        _self_test()
+        return
     errors: list[str] = []
     check_spec(errors)
     check_phone(errors, load_plist(PHONE_PLIST))
