@@ -62,7 +62,7 @@ workflows:
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/PULSE.xcodeproj" \
             --scheme "$XCODE_SCHEME"
-      - name: Verify the Watch app is inside the IPA
+      - name: Verify Watch embed, Info.plist platforms, and altool
         script: bash Scripts/ci_verify_ipa.sh
     artifacts:
       - build/ios/ipa/*.ipa

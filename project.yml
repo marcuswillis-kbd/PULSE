@@ -19,21 +19,16 @@ targets:
         excludes:
           - "**/*.entitlements"
           - "**/Info.plist"
+    info:
+      path: Phone/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pulsebreath.local.PULSE
-        GENERATE_INFOPLIST_FILE: YES
+        # Explicit Info.plist so CFBundleSupportedPlatforms stays an array
+        # of one string. A generated plist can leave altool unable to decide
+        # the platform (error 19) even when the value prints as iPhoneOS.
+        GENERATE_INFOPLIST_FILE: "NO"
         TARGETED_DEVICE_FAMILY: "1"
-        INFOPLIST_KEY_CFBundleDisplayName: PULSE
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: "NO"
-        # The phone does not query HealthKit. It displays BPM the Watch sends.
-        # The entitlement is still required: Apple expects the companion iOS
-        # target to carry HealthKit when the embedded watchOS app starts an
-        # HKWorkoutSession, and App Store validation requires these strings
-        # on every target that has the entitlement.
-        INFOPLIST_KEY_NSHealthShareUsageDescription: PULSE shows the heart rate your Apple Watch reads during a breathing session.
-        INFOPLIST_KEY_NSHealthUpdateUsageDescription: PULSE uses a temporary Apple Watch workout to measure heart rate. This iPhone app does not save health data.
         CODE_SIGN_ENTITLEMENTS: Phone/PULSE.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:

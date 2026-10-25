@@ -32,4 +32,15 @@ echo "Watch app embedded at ${watch#"$tmp"/}"
 codesign -d --entitlements :- "$phone" 2>/dev/null | grep -q 'com.apple.developer.healthkit'
 codesign -d --entitlements :- "$watch" 2>/dev/null | grep -q 'com.apple.developer.healthkit'
 echo "HealthKit entitlement is present on PULSE.app and PULSEWatch.app"
+python3 Scripts/check_ipa_plists.py "$tmp/Payload"
+
+# Publish runs altool --upload-app, which fails with
+# "Cannot determine the 'platform' from the info.plist" before any
+# server response. Validate here so that error sits under the plist dump.
+echo "Validating $ipa with altool"
+app-store-connect publish \
+  --path "$ipa" \
+  --enable-package-validation \
+  --skip-package-upload \
+  --no-color
 echo "IPA: $ipa"
