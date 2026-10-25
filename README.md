@@ -74,11 +74,13 @@ TestFlight shows the App Store Connect name **Connected pulse**. The icon label 
 
 ## Features
 
-iPhone breathing pacer with adjustable inhale, hold and exhale. Apple Watch heart-rate collection using HealthKit (`HKWorkoutSession` / `HKLiveWorkoutBuilder`) and WatchConnectivity messages.
+The home screen opens on Coherence: 5.5 seconds in, 5.5 seconds out, no hold, about 5.5 breaths a minute. Custom timing and CO2/O2 tables are next to it. The iPhone breathing guide has no cap on inhale, hold or exhale. The session screen is black and white: white grows from a centre circle on the inhale, holds with a subtle pulse, and shrinks on the exhale. The pulse follows a live Watch heart rate when one is present, and a slow fixed rhythm otherwise. It never invents a BPM. Optional CO2 and O2 tables lengthen the hold or shorten the rest across rounds. The longest completed hold, a session list, and a daily streak stay on the phone. A one-time notice appears before a long hold or a training table: not in or near water, not while driving, not standing where a faint could injure you, and stop if dizzy. Coherence keeps the same screen and does not show a score or a heart-rate wave yet. Each saved session stores every phase's start, end, and planned length, plus any real heart-rate samples as seconds from the start, so a later wave can use the same timeline.
+
+Apple Watch heart-rate collection uses HealthKit (`HKWorkoutSession` / `HKLiveWorkoutBuilder`) and WatchConnectivity. The Watch runs the same phase guide and haptics when a session starts on either device. Each phase records a start and end time so a later heart-rate view can line up with the breath. There is no heart-rate graph and no microphone breath detection.
 
 ## Limitations
 
-No continuous HRV stream. Live BPM depends on Watch sensor sampling and WatchConnectivity reachability. The breathing guide is a timer, not a measurement of breathing. No cloud storage of health data.
+No continuous HRV stream, coherence score, or live heart-rate wave yet. Live BPM depends on Watch sensor sampling and WatchConnectivity reachability. The breathing guide is a timer, not a measurement of breathing. No cloud storage of health data.
 
 The iPhone target has the HealthKit entitlement because the Watch workout is part of the companion app. The iPhone code does not read HealthKit itself. The Watch discards the workout when the session stops. The iPhone app does not declare a workout background mode; `workout-processing` is only on the Watch, which is what keeps the heart-rate session running.
 

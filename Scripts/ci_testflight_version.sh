@@ -71,9 +71,14 @@ else
   exit 1
 fi
 
+# Builds through 6 already used CFBundleVersion 1 and 6. Never export those again.
+minimum_build=7
 next="$((latest + 1))"
 if [ "$cm_build" -gt "$next" ]; then
   next="$cm_build"
+fi
+if [ "$next" -lt "$minimum_build" ]; then
+  next="$minimum_build"
 fi
 if [ "$next" -le "$latest" ]; then
   echo "Build number ${next} is not greater than TestFlight build ${latest}."

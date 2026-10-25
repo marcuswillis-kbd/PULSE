@@ -19,6 +19,7 @@ targets:
         excludes:
           - "**/*.entitlements"
           - "**/Info.plist"
+      - path: Shared
     # No `info:` key. XcodeGen writePlists() replaces info.path with a
     # default template (bundle id, name, versions 1.0 and 1, package type)
     # and deletes every other key. CI runs `xcodegen generate` before the
@@ -54,6 +55,7 @@ targets:
         excludes:
           - "**/*.entitlements"
           - "**/Info.plist"
+      - path: Shared
     # Same as the iPhone target: do not set `info:`. A regenerated Watch
     # plist drops WKApplication and WKCompanionAppBundleIdentifier, which
     # App Store Connect rejects on a companion watchOS app. Watch/Info.plist
