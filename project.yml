@@ -38,9 +38,11 @@ targets:
       # type: application (not application.watchapp2) is the single-target
       # watchOS 10 product. watchapp2 duplicates the executable and fails
       # with "Multiple commands produce". link stays false so the Watch app
-      # is embedded, not linked as a library. CodeSignOnCopy is applied by
-      # Scripts/patch_watch_embed.py during the TestFlight workflow only;
-      # the unsigned compile test keeps the embed phase that already built.
+      # is embedded, not linked as a library. XcodeGen copies it to
+      # PULSE.app/Watch (dstSubfolderSpec 16). PlugIns is for appex
+      # extensions; altool cannot decide a platform when this APPL bundle
+      # is there. The TestFlight workflow runs Scripts/patch_watch_embed.py
+      # to keep that Watch destination and add CodeSignOnCopy.
       - target: PULSEWatch
         embed: true
         link: false

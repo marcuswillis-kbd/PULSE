@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Point the Watch embed phase at PlugIns and sign it on copy.
+"""Keep the Watch app in PULSE.app/Watch and sign it on copy.
 
-Xcode 26 installs a single-target watchOS app only from the iPhone bundle's
-PlugIns directory. XcodeGen 2.45 still emits the legacy Watch directory
-(dstSubfolderSpec 16). Device install then fails with:
+altool reads every embedded APPL bundle when it decides the IPA platform.
+A single-target watchOS app belongs at Watch/PULSEWatch.app:
 
-    PULSEWatch.app is a Foundation extension and must be embedded in the
-    parent app bundle's PlugIns directory
+    dstSubfolderSpec = 16
+    dstPath = $(CONTENTS_FOLDER_PATH)/Watch
 
-The unsigned simulator compile does not install, so this patch runs only in
-the TestFlight workflow. Leaving the generated project alone keeps
-pulse-ios-watch on the embed phase that already compiled.
+PlugIns is for appex extensions. An APPL bundle whose platform is WatchOS
+in PlugIns makes altool fail with "Cannot determine the 'platform' from
+the info.plist". XcodeGen already emits the Watch destination. This patch
+puts that destination back if it was pointed at PlugIns, and sets
+CodeSignOnCopy. It runs only in the TestFlight workflow.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from pathlib import Path
 
 WATCH_DST = 'dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";'
 PLUGINS_DST = 'dstPath = "";'
-LEGACY_SPEC = "dstSubfolderSpec = 16;"
+WATCH_SPEC = "dstSubfolderSpec = 16;"
 PLUGINS_SPEC = "dstSubfolderSpec = 13;"
 EMBED_NAME = 'name = "Embed Watch Content";'
 BUILD_FILE_MARK = "/* PULSEWatch.app in Embed Watch Content */ = {"
@@ -67,15 +68,12 @@ def patch(text: str) -> str:
 
     open_brace, end = _object_containing(text, text.find(EMBED_NAME))
     block = text[open_brace:end]
-    if WATCH_DST in block:
-        block = block.replace(WATCH_DST, PLUGINS_DST, 1)
-        if LEGACY_SPEC not in block:
-            raise SystemExit("Embed Watch Content phase has no dstSubfolderSpec 16")
-        block = block.replace(LEGACY_SPEC, PLUGINS_SPEC, 1)
-    elif PLUGINS_DST not in block or PLUGINS_SPEC not in block:
+    block = block.replace(PLUGINS_DST, WATCH_DST)
+    block = block.replace(PLUGINS_SPEC, WATCH_SPEC)
+    if WATCH_DST not in block or WATCH_SPEC not in block:
         raise SystemExit(
-            "Embed Watch Content phase is neither the legacy Watch folder "
-            "nor PlugIns. Refusing to guess a destination."
+            "Embed Watch Content phase is not PULSE.app/Watch "
+            "(dstSubfolderSpec 16, dstPath $(CONTENTS_FOLDER_PATH)/Watch)."
         )
     text = text[:open_brace] + block + text[end:]
 
@@ -93,16 +91,58 @@ def patch(text: str) -> str:
     return text[:open_brace] + block + text[end:]
 
 
-def main() -> None:
-    path = Path(sys.argv[1] if len(sys.argv) > 1 else "PULSE.xcodeproj/project.pbxproj")
-    original = path.read_text()
-    updated = patch(original)
-    if 'name = "Embed Watch Content";' not in updated or "dstSubfolderSpec = 13;" not in updated:
-        raise SystemExit("Watch embed patch did not land in PlugIns")
-    if "CodeSignOnCopy" not in updated:
+def _assert_watch_embed(text: str) -> None:
+    if EMBED_NAME not in text or WATCH_SPEC not in text or WATCH_DST not in text:
+        raise SystemExit("Watch embed patch did not land in PULSE.app/Watch")
+    open_brace, end = _object_containing(text, text.find(EMBED_NAME))
+    block = text[open_brace:end]
+    if PLUGINS_SPEC in block or PLUGINS_DST in block:
+        raise SystemExit("Watch embed patch left the PlugIns destination in place")
+    if "CodeSignOnCopy" not in text:
         raise SystemExit("Watch embed patch did not set CodeSignOnCopy")
+
+
+def main() -> None:
+    if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
+        _self_test()
+        return
+    path = Path(sys.argv[1] if len(sys.argv) > 1 else "PULSE.xcodeproj/project.pbxproj")
+    updated = patch(path.read_text())
+    _assert_watch_embed(updated)
     path.write_text(updated)
-    print(f"Embedded PULSEWatch.app in PlugIns with CodeSignOnCopy ({path})")
+    print(f"Embedded PULSEWatch.app in Watch with CodeSignOnCopy ({path})")
+
+
+def _fixture(dst_path: str, spec: str) -> str:
+    return f"""
+		DEAD /* PULSEWatch.app in Embed Watch Content */ = {{
+			isa = PBXBuildFile;
+			fileRef = BEEF /* PULSEWatch.app */;
+		}};
+		FACE /* Embed Watch Content */ = {{
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = {dst_path};
+			dstSubfolderSpec = {spec};
+			files = (
+				DEAD /* PULSEWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		}};
+"""
+
+
+def _self_test() -> None:
+    for label, text in (
+        ("plugins", _fixture('""', "13")),
+        ("watch", _fixture('"$(CONTENTS_FOLDER_PATH)/Watch"', "16")),
+    ):
+        updated = patch(text)
+        _assert_watch_embed(updated)
+        if updated.count("CodeSignOnCopy") != 1:
+            raise SystemExit(f"{label} fixture CodeSignOnCopy count is wrong")
+    print("self-test ok")
 
 
 if __name__ == "__main__":

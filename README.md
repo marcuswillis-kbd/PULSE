@@ -39,7 +39,7 @@ ios_signing:
     - pulse_distribution
 ```
 
-Codemagic rejects `ios_signing` when only `certificates` is set. The other legal form is `distribution_type: app_store` plus `bundle_identifier`, which also matches `com.pulsebreath.local.PULSE.*`, and that form cannot be combined with the reference-name lists. Naming both profiles is what the workflow uses, so the Watch profile is fetched directly. `xcode-project use-profiles` applies them. The Watch app stays embedded in `PULSE.app/PlugIns`.
+Codemagic rejects `ios_signing` when only `certificates` is set. The other legal form is `distribution_type: app_store` plus `bundle_identifier`, which also matches `com.pulsebreath.local.PULSE.*`, and that form cannot be combined with the reference-name lists. Naming both profiles is what the workflow uses, so the Watch profile is fetched directly. `xcode-project use-profiles` applies them. The Watch app stays embedded in `PULSE.app/Watch`.
 
 ## What is left before the build
 
@@ -55,7 +55,7 @@ Screen: Codemagic → Applications → PULSE → Start new build.
 2. Workflow: `pulse-testflight`.
 3. Start the build.
 
-The workflow generates the Xcode project, embeds `PULSEWatch.app` in `PULSE.app/PlugIns`, fetches `pulse_distribution`, `pulse_app_store`, and `pulse_watch_app_store`, applies them with `xcode-project use-profiles`, sets the build number to one higher than the latest TestFlight build for Apple ID `6826766285`, exports an `.ipa`, checks the Watch app, HealthKit entitlement, and Info.plist companion keys are inside it, uploads to App Store Connect, and sets `submit_to_testflight: true`.
+The workflow generates the Xcode project, embeds `PULSEWatch.app` in `PULSE.app/Watch`, fetches `pulse_distribution`, `pulse_app_store`, and `pulse_watch_app_store`, applies them with `xcode-project use-profiles`, sets `CURRENT_PROJECT_VERSION` to the greater of Codemagic `$BUILD_NUMBER` and one more than the latest TestFlight build for Apple ID `6826766285`, exports an `.ipa`, checks the Watch app, its executable, the HealthKit entitlement, and Info.plist companion keys, uploads to App Store Connect, and sets `submit_to_testflight: true`.
 
 `Phone/Info.plist` and `Watch/Info.plist` are the files Xcode compiles. `project.yml` points at them with `INFOPLIST_FILE` and `GENERATE_INFOPLIST_FILE: "NO"`, and it has no XcodeGen `info:` block. `xcodegen generate` rewrites any plist named by `info.path` down to a default template, which drops `WKApplication` and `WKCompanionAppBundleIdentifier`. Leave those keys in `Watch/Info.plist`.
 

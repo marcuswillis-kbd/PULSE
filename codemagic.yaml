@@ -53,7 +53,7 @@ workflows:
           brew install xcodegen
           xcodegen generate --spec project.yml
           python3 Scripts/check_source_plists.py
-      - name: Embed the Watch app for Xcode 26
+      - name: Embed the Watch app in Watch/
         script: python3 Scripts/patch_watch_embed.py PULSE.xcodeproj/project.pbxproj
       - name: Apply provisioning profiles
         script: xcode-project use-profiles
@@ -61,9 +61,12 @@ workflows:
         script: bash Scripts/ci_testflight_version.sh
       - name: Archive and export IPA
         script: |
+          build_number="$(tr -d '[:space:]' < /tmp/pulse-build-number)"
+          test -n "$build_number"
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/PULSE.xcodeproj" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO CURRENT_PROJECT_VERSION=${build_number}"
       - name: Verify Watch embed, Info.plist platforms, and altool
         script: bash Scripts/ci_verify_ipa.sh
     artifacts:

@@ -77,7 +77,7 @@ def check_payload(payload: Path) -> None:
         raise SystemExit(f"No .app bundles under {payload}")
 
     phone = payload / "PULSE.app"
-    watch = phone / "PlugIns" / "PULSEWatch.app"
+    watch = phone / "Watch" / "PULSEWatch.app"
     allowed = {phone.resolve(), watch.resolve()}
     unexpected = [app for app in apps if app.resolve() not in allowed]
     print("App bundles in the IPA:")
@@ -90,12 +90,12 @@ def check_payload(payload: Path) -> None:
         errors.append(
             "Unexpected app bundle(s): "
             f"{rendered}. Payload may only contain PULSE.app and "
-            "PULSE.app/PlugIns/PULSEWatch.app."
+            "PULSE.app/Watch/PULSEWatch.app."
         )
     if not phone.is_dir():
         errors.append("Payload/PULSE.app is missing.")
     if not watch.is_dir():
-        errors.append("Payload/PULSE.app/PlugIns/PULSEWatch.app is missing.")
+        errors.append("Payload/PULSE.app/Watch/PULSEWatch.app is missing.")
     if errors:
         raise SystemExit("\n".join(errors))
 
@@ -245,19 +245,19 @@ def _self_test() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         _write(root / "PULSE.app", phone)
-        _write(root / "PULSE.app" / "PlugIns" / "PULSEWatch.app", watch)
+        _write(root / "PULSE.app" / "Watch" / "PULSEWatch.app", watch)
         check_payload(root)
         stripped = root / "stripped"
         _write(stripped / "PULSE.app", phone)
         _write(
-            stripped / "PULSE.app" / "PlugIns" / "PULSEWatch.app",
+            stripped / "PULSE.app" / "Watch" / "PULSEWatch.app",
             {key: value for key, value in watch.items() if key != "LSRequiresIPhoneOS"},
         )
         check_payload(stripped)
         watch_requires_ios = root / "watch-requires-ios"
         _write(watch_requires_ios / "PULSE.app", phone)
         _write(
-            watch_requires_ios / "PULSE.app" / "PlugIns" / "PULSEWatch.app",
+            watch_requires_ios / "PULSE.app" / "Watch" / "PULSEWatch.app",
             {**watch, "LSRequiresIPhoneOS": True},
         )
         try:
@@ -269,7 +269,7 @@ def _self_test() -> None:
             raise SystemExit("Watch LSRequiresIPhoneOS true was accepted")
         broken = root / "broken"
         _write(broken / "PULSE.app", {**phone, "CFBundleSupportedPlatforms": "iPhoneOS"})
-        _write(broken / "PULSE.app" / "PlugIns" / "PULSEWatch.app", watch)
+        _write(broken / "PULSE.app" / "Watch" / "PULSEWatch.app", watch)
         try:
             check_payload(broken)
         except SystemExit as error:
@@ -280,7 +280,7 @@ def _self_test() -> None:
         missing_wk = root / "missing-wk"
         _write(missing_wk / "PULSE.app", phone)
         _write(
-            missing_wk / "PULSE.app" / "PlugIns" / "PULSEWatch.app",
+            missing_wk / "PULSE.app" / "Watch" / "PULSEWatch.app",
             {key: value for key, value in watch.items() if key != "WKApplication"},
         )
         try:
