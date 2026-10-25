@@ -10,9 +10,74 @@ workflows:
         script: |
           brew install xcodegen
           xcodegen generate --spec project.yml
+          python3 Scripts/check_source_plists.py
       - name: Compile for iPhone simulator
         script: |
           xcodebuild -project PULSE.xcodeproj -scheme PULSE -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
     artifacts:
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - /tmp/xcodebuild_logs/*.log
+
+  # Signed archive for TestFlight.
+  #
+  # Fetches stored Code signing identities by reference name. Codemagic
+  # requires provisioning_profiles here; certificates alone are rejected.
+  # distribution_type + bundle_identifier is the other legal form, and it
+  # cannot be combined with these lists. Named profiles are used so the
+  # Watch profile is fetched even if extension matching misses it.
+  #   pulse_app_store        com.pulsebreath.local.PULSE
+  #   pulse_watch_app_store  com.pulsebreath.local.PULSE.watchkitapp
+  #   pulse_distribution     Apple Distribution certificate
+  pulse-testflight:
+    name: PULSE TestFlight (signed iPhone + Watch)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: PULSE ASC
+    environment:
+      xcode: latest
+      ios_signing:
+        provisioning_profiles:
+          - pulse_app_store
+          - pulse_watch_app_store
+        certificates:
+          - pulse_distribution
+      vars:
+        BUNDLE_ID: com.pulsebreath.local.PULSE
+        WATCH_BUNDLE_ID: com.pulsebreath.local.PULSE.watchkitapp
+        XCODE_SCHEME: PULSE
+        APP_STORE_APPLE_ID: "6826766285"
+    scripts:
+      - name: Generate Xcode project
+        script: |
+          brew install xcodegen
+          xcodegen generate --spec project.yml
+          python3 Scripts/check_source_plists.py
+      - name: Embed the Watch app in Watch/
+        script: python3 Scripts/patch_watch_embed.py PULSE.xcodeproj/project.pbxproj
+      - name: Apply provisioning profiles
+        script: xcode-project use-profiles
+      - name: Increment build number from TestFlight
+        script: bash Scripts/ci_testflight_version.sh
+      - name: Archive and export IPA
+        script: |
+          build_number="$(tr -d '[:space:]' < /tmp/pulse-build-number)"
+          test -n "$build_number"
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/PULSE.xcodeproj" \
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO CURRENT_PROJECT_VERSION=${build_number}"
+      - name: Verify Watch embed, Info.plist platforms, and altool
+        script: bash Scripts/ci_verify_ipa.sh
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Internal TestFlight only. submit_to_testflight sends the build to
+        # external beta review, which fails while Test Information (feedback
+        # email and beta review contact) is empty. Group Marcus is internal.
+        beta_groups:
+          - Marcus
